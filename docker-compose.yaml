@@ -1,0 +1,94 @@
+version: "3"
+services:
+  redis:
+    image: redis
+    restart: always
+    ports:
+      - "6380:6379"
+
+  authdb:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: users
+    ports:
+      - "5433:5432"
+
+  migration:
+    build: ./auth
+    depends_on:
+      - authdb
+      - redis
+    command: npx sequelize-cli db:migrate
+    environment:
+      DB_HOST: authdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: users
+      DB_PORT: 5432
+    
+  authserver:
+    build: ./auth
+    depends_on:
+      - authdb
+      - redis
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./auth:/app
+    environment:
+      DB_HOST: authdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: users
+      DB_PORT: 5432
+
+  backenddb:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: data
+    ports:
+      - "5434:5432"
+
+  backenddbmigration:
+    build: ./backend
+    depends_on:
+      - backenddb
+    command: npx sequelize-cli db:migrate
+    environment:
+      DB_HOST: backenddb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: data
+      DB_PORT: 5432
+
+  backend:
+    build: ./backend
+    depends_on:
+      - backenddb
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend:/app
+    environment:
+      DB_HOST: backenddb
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: data
+      DB_PORT: 5432
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+    environment:
+      REACT_APP_BACKEND_URL: http://localhost:8001
+      REACT_APP_AUTH_URL: http://localhost:8000
+  
